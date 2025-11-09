@@ -2,6 +2,6 @@
 
 mkdir ..\..\build
 pushd ..\..\build
-cl ..\untitled\code\win32_handmade.cpp
+cl -Zi ..\repo\code\win32_handmade.cpp
 
 popd
