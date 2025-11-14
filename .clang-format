@@ -1,0 +1,24 @@
+Language: Cpp
+BasedOnStyle: Microsoft
+BreakBeforeBraces: Stroustrup
+IndentWidth: 4
+TabWidth: 2
+UseTab: Never
+ColumnLimit: 80
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignOperands: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: true
+BreakBeforeInheritanceComma: true
+BreakInheritanceList: BeforeComma  # or BeforeColon
+AlwaysBreakTemplateDeclarations: Yes
