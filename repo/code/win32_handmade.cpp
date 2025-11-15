@@ -1,7 +1,16 @@
 #include <windows.h>
-#include <winuser.h>
 
-bool Running = false;
+// TODO: this is global now
+// NOTE: CONFUSING
+// it means something different, based on where you put it
+
+#define internal static
+//NOTE: local to the file that is in
+//(cannot be called from other files)
+
+#define local_persist static // locally scoped, but persisting
+#define global_variable static
+global_variable bool Running; // this is initialized to 0
 
 LRESULT CALLBACK MainWindowCallback(HWND   Window,
                                     UINT   Message,
@@ -16,11 +25,14 @@ LRESULT CALLBACK MainWindowCallback(HWND   Window,
     } break;
 
     case WM_DESTROY: {
+        // TODO: handle this with message to user
         OutputDebugStringA("WM_DESTROY");
     } break;
 
     case WM_CLOSE: {
-        PostQuitMessage(0);
+        // PostQuitMessage(0);
+        Running = false;
+        // TODO: handle this with error - recreate window?
         OutputDebugStringA("WM_CLOSE");
     } break;
 
@@ -41,7 +53,7 @@ LRESULT CALLBACK MainWindowCallback(HWND   Window,
         int Height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;
 
         // static not using in prod
-        static DWORD Operation = WHITENESS;
+        local_persist DWORD Operation = WHITENESS;
         PatBlt(DeviceContext, X, Y, Width, Height, Operation);
 
         if (Operation == WHITENESS) {
@@ -87,16 +99,17 @@ int CALLBACK WinMain(HINSTANCE Instance,
                                            0);
         if (WindowHandle) {
             MSG Message;
-            for (;;) {
+            Running = true;
+            while (Running) {
                 BOOL MessageResult = GetMessage(&Message, 0, 0, 0);
-                if (Running) {
-                    break;
-                }
                 if (MessageResult > 0) {
                     TranslateMessage(&Message);
                     DispatchMessage(&Message);
                 }
                 else {
+                    // NOTE: we don't to have to clean memory
+                    // to use RAII, windows will do it for us
+                    //... slow closing
                     break;
                 }
             }
