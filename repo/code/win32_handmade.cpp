@@ -2,9 +2,6 @@
 #include <wingdi.h>
 
 // TODO: this is global now
-// NOTE: CONFUSING
-// it means something different, based on where you put it
-
 #define internal static
 // NOTE: local to the file that is in
 //(cannot be called from other files)
@@ -17,7 +14,6 @@ global_variable void      *BitmapMemory;
 global_variable HBITMAP    BitmapHandle;
 global_variable HDC        BitmapDeviceContext;
 
-// d3_1
 internal void Win32ResizeDIBSection(int Width, int Height)
 {
 
@@ -39,13 +35,6 @@ internal void Win32ResizeDIBSection(int Width, int Height)
     BitmapInfo.bmiHeader.biPlanes      = 1;
     BitmapInfo.bmiHeader.biBitCount    = 32;
     BitmapInfo.bmiHeader.biCompression = BI_RGB;
-    // NOTE: due to intializing as static this stuff are initialized as 0
-    // so there is no need to initialize
-    //  BitmapInfo.bmiHeader.biSizeImage     = 0;
-    //  BitmapInfo.bmiHeader.biXPelsPerMeter = 0;
-    //  BitmapInfo.bmiHeader.biYPelsPerMeter = 0;
-    //  BitmapInfo.bmiHeader.biClrUsed       = 0;
-    //  BitmapInfo.bmiHeader.biClrImportant  = 0;
 
     BitmapHandle = CreateDIBSection(
         BitmapDeviceContext, &BitmapInfo, DIB_RGB_COLORS, &BitmapMemory, 0, 0);
@@ -95,7 +84,6 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
     } break;
 
     case WM_CLOSE: {
-        // PostQuitMessage(0);
         Running = false;
         // TODO: handle this with error - recreate window?
         OutputDebugStringA("WM_CLOSE");
@@ -121,7 +109,7 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         EndPaint(Window, &PaintStruct);
     }
     default: {
-        // OutputDebugStringA("WM_DESTROY");
+        OutputDebugStringA("WM_Default");
         Result = DefWindowProc(Window, Message, WParam, LParam);
     } break;
     }
@@ -162,9 +150,6 @@ int CALLBACK WinMain(HINSTANCE Instance,
                     DispatchMessage(&Message);
                 }
                 else {
-                    // NOTE: we don't to have to clean memory
-                    // to use RAII, windows will do it for us
-                    //... slow closing
                     break;
                 }
             }
