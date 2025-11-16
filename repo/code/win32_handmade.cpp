@@ -11,23 +11,9 @@
 global_variable bool       Running; // this is initialized to 0
 global_variable BITMAPINFO BitmapInfo;
 global_variable void      *BitmapMemory;
-global_variable HBITMAP    BitmapHandle;
-global_variable HDC        BitmapDeviceContext;
 
 internal void Win32ResizeDIBSection(int Width, int Height)
 {
-
-    // TODO: bolletproof this
-    // maybe dont free first, free after, then free first if that fails
-    // free our DIBSection
-    if (BitmapHandle) {
-        DeleteObject(BitmapHandle);
-    }
-    if (!BitmapDeviceContext) {
-        // TODO: should we recreate these under some special circumstantes?
-        // unplug monitor...
-        BitmapDeviceContext = CreateCompatibleDC(0);
-    }
 
     BitmapInfo.bmiHeader.biSize        = sizeof(BitmapInfo.bmiHeader);
     BitmapInfo.bmiHeader.biWidth       = Width;
@@ -35,9 +21,6 @@ internal void Win32ResizeDIBSection(int Width, int Height)
     BitmapInfo.bmiHeader.biPlanes      = 1;
     BitmapInfo.bmiHeader.biBitCount    = 32;
     BitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-    BitmapHandle = CreateDIBSection(
-        BitmapDeviceContext, &BitmapInfo, DIB_RGB_COLORS, &BitmapMemory, 0, 0);
 }
 
 internal void Win32UpdateWindow(
