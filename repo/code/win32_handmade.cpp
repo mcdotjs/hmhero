@@ -34,33 +34,16 @@ internal void renderWeirdGradient(int XOffset, int YOffset)
     // (if uint16...it will be moved by two )
     uint8 *Row = (uint8 *) BitmapMemory;
     for (int Y = 0; Y < BitmapHeight; ++Y) {
-        uint8 *Pixel = (uint8 *) Row;
+        uint32 *Pixel = (uint32 *) Row;
         for (int X = 0; X < BitmapWidth; ++X) {
-            /*
-             * with uint8 PIXEL we are WRITING EACH BYTE IN MEMORY
-             *                   Pixel+0  Pixel+1  Pixel+2  Pixel+3
-             *                   0  1  2  3-th byte
-             * Pixel in memory: 00 00 00 00
-             *                  RR GG BB PP ... ???NOOOO!!!
-             *                  LITTLE ENDIAN ARCHITECTURE!!!!
-             *                  r and b are swapped
-             *                  BB GG RR PP ... ???NOOOO!!!
-             * */
             // blue
-            *Pixel = (uint8) (X + XOffset);
-            ++Pixel;
-            // green
-            *Pixel = (uint8) (Y + YOffset);
-            ++Pixel;
-            // red
-            *Pixel = 0;
-            ++Pixel;
-
-            // padidng
-            *Pixel = 0;
-            ++Pixel;
+            uint8 Blue  = (uint8) (X + XOffset);
+            uint8 Green = (uint8) (Y + YOffset);
+            *Pixel++    = ((Green << 8) | Blue);
         }
-        Row += Pitch;
+        // Row += Pitch;
+        // OR
+        Row = (uint8 *) Pixel;
     }
 }
 internal void Win32ResizeDIBSection(int Width, int Height)
@@ -161,7 +144,10 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
     case WM_ACTIVATEAPP: {
         OutputDebugStringA("WM_ACTIVATEAPP");
     } break;
-
+        // NOTE: later
+        // case WM_SETCURSOR: {
+        //     SetCursor(0);
+        // } break;
     case WM_PAINT: {
         // d3_0
         PAINTSTRUCT PaintStruct;
