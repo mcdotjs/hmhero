@@ -151,8 +151,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
     LRESULT Result = 0;
 
     switch (Message) {
-    case WM_SIZE: {
-    } break;
+    // case WM_SIZE: {
+    // } break;
 
     case WM_DESTROY: {
         // TODO: handle this with message to user
@@ -215,9 +215,9 @@ int CALLBACK WinMain(HINSTANCE Instance,
 
     WNDCLASS WindowClass = {};
     Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
-    WindowClass.style =
-        CS_HREDRAW | CS_VREDRAW; // when resizing window refresh whole window,
-                                 // not just changed parts
+    WindowClass.style = CS_HREDRAW | CS_VREDRAW
+                        | CS_OWNDC; // when resizing window refresh whole
+                                    // window, not just changed parts
     WindowClass.lpfnWndProc   = Win32MainWindowCallback;
     WindowClass.hInstance     = Instance;
     WindowClass.lpszClassName = "HandmadeHeroWindowClass";
@@ -236,9 +236,14 @@ int CALLBACK WinMain(HINSTANCE Instance,
                                       Instance,
                                       0);
         if (Window) {
-            int XOffset   = 0;
-            int YOffset   = 0;
-            GlobalRunning = true;
+            // NOTE: (context1) this is usually not alloved by windows
+            // unless you asked specifically for it
+            // by this flag CS_OWNDC.. and we are not sharing context
+            // with anyone
+            HDC DeviceContext = GetDC(Window);
+            int XOffset       = 0;
+            int YOffset       = 0;
+            GlobalRunning     = true;
             while (GlobalRunning) {
                 MSG Message;
                 // NOTE: if (PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) {
@@ -252,8 +257,9 @@ int CALLBACK WinMain(HINSTANCE Instance,
                     DispatchMessage(&Message);
                 }
 
+                // NOTE: (context2)  and you have to instatianed context in
+                // every loop HDC DeviceContext = GetDC(Window);
                 RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
-                HDC                    DeviceContext = GetDC(Window);
                 win32_window_dimension Dimension =
                     Win32GetWindowDimension(Window);
                 Win32DisplayBufferInWindow(DeviceContext,
@@ -264,7 +270,8 @@ int CALLBACK WinMain(HINSTANCE Instance,
                                            0,
                                            Dimension.Width,
                                            Dimension.Height);
-                ReleaseDC(Window, DeviceContext);
+                // NOTE: (context3) and you dont have to release it
+                // ReleaseDC(Window, DeviceContext);
                 ++XOffset;
                 ++YOffset;
             }
