@@ -25,7 +25,7 @@ struct win32_offscreen_buffer {
     int        BitesPerPixel;
 };
 
-global_variable bool                   Running;
+global_variable bool                   GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 
 struct win32_window_dimension {
@@ -45,7 +45,7 @@ win32_window_dimension Win32GetWindowDimension(HWND Window)
     return Result;
 };
 
-internal void renderWeirdGradient(win32_offscreen_buffer Buffer,
+internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
                                   int                    XOffset,
                                   int                    YOffset)
 {
@@ -54,15 +54,18 @@ internal void renderWeirdGradient(win32_offscreen_buffer Buffer,
     // NOTE: we need it for shifting byte by byte
     // because C it multiply by size of thing being pointed to
     // (if uint16...it will be moved by two )
-    uint8 *Row = (uint8 *) Buffer.Memory;
+    uint8 *Row = (uint8 *) Buffer.Memory; // get the row
     for (int Y = 0; Y < Buffer.Height; ++Y) {
-        uint32 *Pixel = (uint32 *) Row;
+        uint32 *Pixel = (uint32 *) Row; // get the pixel of the row
         for (int X = 0; X < Buffer.Width; ++X) {
             // blue
             uint8 Blue  = (uint8) (X + XOffset);
             uint8 Green = (uint8) (Y + YOffset);
-            *Pixel++    = ((Green << 8) | Blue);
+            // xx RR GG BB xx RR GG BB
+            *Pixel++ = ((Green << 8) | Blue);
+            // NOTE: *Pixel = *Pixel + 1*sizeof(uint32) // a that is 4
         }
+        // row is in bytes, Pitch is in bytes ... not in uint8
         Row += Buffer.Pitch;
         // OR
         // Row = (uint8 *) Pixel;
@@ -82,8 +85,12 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Height = Height;
     Buffer->Width  = Width;
 
-    Buffer->Info.bmiHeader.biSize        = sizeof(Buffer->Info.bmiHeader);
-    Buffer->Info.bmiHeader.biWidth       = Buffer->Width;
+    Buffer->Info.bmiHeader.biSize  = sizeof(Buffer->Info.bmiHeader);
+    Buffer->Info.bmiHeader.biWidth = Buffer->Width;
+
+    // NOTE: when biHeight is negative, this is clue to Windows to treat this
+    // bitmap
+    //  as top-down ... meannig that first three bytes are RGB of top left pixel
     Buffer->Info.bmiHeader.biHeight      = -Buffer->Height;
     Buffer->Info.bmiHeader.biPlanes      = 1;
     Buffer->Info.bmiHeader.biBitCount    = 32;
@@ -124,12 +131,12 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                   // Height,
                   0,
                   0,
-                  Buffer.Width,
-                  Buffer.Height,
-                  0,
-                  0,
                   WindowWidth,
                   WindowHeight,
+                  0,
+                  0,
+                  Buffer.Width,
+                  Buffer.Height,
                   Buffer.Memory,
                   &Buffer.Info,
                   DIB_RGB_COLORS,
@@ -145,13 +152,6 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
 
     switch (Message) {
     case WM_SIZE: {
-        OutputDebugStringA("WM_SIZE");
-        win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-
-        // NOTE: Win32ResizeDIBSection sa vola vzdy pri resize
-        //  you need free that memory
-        Win32ResizeDIBSection(
-            &GlobalBackBuffer, Dimension.Width, Dimension.Height);
     } break;
 
     case WM_DESTROY: {
@@ -160,7 +160,7 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
     } break;
 
     case WM_CLOSE: {
-        Running = false;
+        GlobalRunning = false;
         // TODO: handle this with error - recreate window?
         OutputDebugStringA("WM_CLOSE");
     } break;
@@ -179,9 +179,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
 
         // break moze byt aj inside block
         HDC DeviceContext = BeginPaint(Window, &PaintStruct);
-        EndPaint(Window, &PaintStruct);
-        int X      = PaintStruct.rcPaint.left;
-        int Y      = PaintStruct.rcPaint.right;
+        int X             = PaintStruct.rcPaint.left;
+        int Y             = PaintStruct.rcPaint.right;
         int Width  = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;
         int Height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;
 
@@ -194,6 +193,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                                    Y,
                                    Width,
                                    Height);
+        // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all was
+        // done
         EndPaint(Window, &PaintStruct);
     }
     default: {
@@ -209,7 +210,11 @@ int CALLBACK WinMain(HINSTANCE Instance,
                      PSTR      CommandLine,
                      int       ShowCode)
 {
+    // NOTE: stack overflow
+    // uint8 BigOldHeavyBlockOfMemory[ 2 * 1024 * 1024] = {};
+
     WNDCLASS WindowClass = {};
+    Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
     WindowClass.style =
         CS_HREDRAW | CS_VREDRAW; // when resizing window refresh whole window,
                                  // not just changed parts
@@ -218,37 +223,39 @@ int CALLBACK WinMain(HINSTANCE Instance,
     WindowClass.lpszClassName = "HandmadeHeroWindowClass";
 
     if (RegisterClass(&WindowClass)) {
-        HWND Window = CreateWindowEx(0,
-                                     WindowClass.lpszClassName,
-                                     "HandmadeHeroWindowClass",
-                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                                     CW_USEDEFAULT,
-                                     CW_USEDEFAULT,
-                                     CW_USEDEFAULT,
-                                     CW_USEDEFAULT,
-                                     0,
-                                     0,
-                                     Instance,
-                                     0);
+        HWND Window = CreateWindowExA(0,
+                                      WindowClass.lpszClassName,
+                                      "HandmadeHeroWindowClass",
+                                      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                                      CW_USEDEFAULT,
+                                      CW_USEDEFAULT,
+                                      CW_USEDEFAULT,
+                                      CW_USEDEFAULT,
+                                      0,
+                                      0,
+                                      Instance,
+                                      0);
         if (Window) {
-            int XOffset = 0;
-            int YOffset = 0;
-            Running     = true;
-            while (Running) {
+            int XOffset   = 0;
+            int YOffset   = 0;
+            GlobalRunning = true;
+            while (GlobalRunning) {
                 MSG Message;
                 // NOTE: if (PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) {
                 // we have a lot of messages ... if to while
                 while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) {
                     if (Message.message == WM_QUIT) {
-                        Running = false;
+                        GlobalRunning = false;
                     }
+                    // NOTE: actually translating keycodes
                     TranslateMessage(&Message);
                     DispatchMessage(&Message);
                 }
 
-                renderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
+                RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
                 HDC                    DeviceContext = GetDC(Window);
-                win32_window_dimension Dimension = Win32GetWindowDimension(Window);
+                win32_window_dimension Dimension =
+                    Win32GetWindowDimension(Window);
                 Win32DisplayBufferInWindow(DeviceContext,
                                            Dimension.Width,
                                            Dimension.Height,
