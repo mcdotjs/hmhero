@@ -16,13 +16,14 @@ typedef int16_t  int16;
 typedef int32_t  int32;
 typedef int64_t  int64;
 
+// NOTE: pixels are always 32-bits wide, little endian 0x xx RR GG BB
+// memory ordered BB GG RR xx
 struct win32_offscreen_buffer {
     BITMAPINFO Info;
     void      *Memory;
     int        Width;
     int        Height;
     int        Pitch;
-    int        BitesPerPixel;
 };
 
 global_variable bool                   GlobalRunning;
@@ -32,6 +33,17 @@ struct win32_window_dimension {
     int Width;
     int Height;
 };
+
+/*
+ *
+ * POINTER ALIASING
+ *
+ * when two pointers could point to same memory,
+ * and the compiler doesn't know if a write to one of those
+ * pointers might effect read from the other
+ *
+ *
+ * */
 
 win32_window_dimension Win32GetWindowDimension(HWND Window)
 {
@@ -58,12 +70,16 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
     for (int Y = 0; Y < Buffer.Height; ++Y) {
         uint32 *Pixel = (uint32 *) Row; // get the pixel of the row
         for (int X = 0; X < Buffer.Width; ++X) {
-            // blue
-            uint8 Blue  = (uint8) (X + XOffset);
-            uint8 Green = (uint8) (Y + YOffset);
             // xx RR GG BB xx RR GG BB
-            *Pixel++ = ((Green << 8) | Blue);
+            // uint8 Blue  = (uint8) (X + XOffset);
+            // uint8 Green = (uint8) (Y + YOffset);
             // NOTE: *Pixel = *Pixel + 1*sizeof(uint32) // a that is 4
+      
+            // Playing
+            uint8 Blue  = X;
+            uint8 Green = Y;
+            uint8 Red   = 255;
+            *Pixel++    = ((X + Y) << 16) * XOffset;
         }
         // row is in bytes, Pitch is in bytes ... not in uint8
         Row += Buffer.Pitch;
@@ -95,23 +111,18 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Info.bmiHeader.biPlanes      = 1;
     Buffer->Info.bmiHeader.biBitCount    = 32;
     Buffer->Info.bmiHeader.biCompression = BI_RGB;
-    Buffer->BitesPerPixel                = 4;
-    int BitmapMemorySize =
-        (Buffer->Width * Buffer->Height) * Buffer->BitesPerPixel;
+    int BitesPerPixel                    = 4;
+    int BitmapMemorySize = (Buffer->Width * Buffer->Height) * BitesPerPixel;
     Buffer->Memory =
         VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 
-    Buffer->Pitch = Buffer->Width * Buffer->BitesPerPixel;
+    Buffer->Pitch = Buffer->Width * BitesPerPixel;
 }
 
 internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                                          int                    WindowWidth,
                                          int                    WindowHeight,
-                                         win32_offscreen_buffer Buffer,
-                                         int                    X,
-                                         int                    Y,
-                                         int                    Width,
-                                         int                    Height)
+                                         win32_offscreen_buffer Buffer)
 {
     /*
      * NOTE:
@@ -151,8 +162,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
     LRESULT Result = 0;
 
     switch (Message) {
-    // case WM_SIZE: {
-    // } break;
+        // case WM_SIZE: {
+        // } break;
 
     case WM_DESTROY: {
         // TODO: handle this with message to user
@@ -173,26 +184,14 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         //     SetCursor(0);
         // } break;
     case WM_PAINT: {
-        // d3_0
         PAINTSTRUCT PaintStruct;
         OutputDebugStringA("WM_PAINT");
 
-        // break moze byt aj inside block
         HDC DeviceContext = BeginPaint(Window, &PaintStruct);
-        int X             = PaintStruct.rcPaint.left;
-        int Y             = PaintStruct.rcPaint.right;
-        int Width  = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;
-        int Height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;
 
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-        Win32DisplayBufferInWindow(DeviceContext,
-                                   Dimension.Width,
-                                   Dimension.Height,
-                                   GlobalBackBuffer,
-                                   X,
-                                   Y,
-                                   Width,
-                                   Height);
+        Win32DisplayBufferInWindow(
+            DeviceContext, Dimension.Width, Dimension.Height, GlobalBackBuffer);
         // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all was
         // done
         EndPaint(Window, &PaintStruct);
@@ -265,11 +264,7 @@ int CALLBACK WinMain(HINSTANCE Instance,
                 Win32DisplayBufferInWindow(DeviceContext,
                                            Dimension.Width,
                                            Dimension.Height,
-                                           GlobalBackBuffer,
-                                           0,
-                                           0,
-                                           Dimension.Width,
-                                           Dimension.Height);
+                                           GlobalBackBuffer);
                 // NOTE: (context3) and you dont have to release it
                 // ReleaseDC(Window, DeviceContext);
                 ++XOffset;
