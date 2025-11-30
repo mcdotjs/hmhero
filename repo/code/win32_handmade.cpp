@@ -35,22 +35,6 @@ struct win32_window_dimension {
     int Height;
 };
 
-#define X_INPUT_GET_STATE(name)                                                \
-    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
-// this line ***
-typedef X_INPUT_GET_STATE(x_input_get_state);
-X_INPUT_GET_STATE(XInputGetStateStub)
-{
-    return 0;
-}
-
-#define X_INPUT_SET_STATE(name)                                                \
-    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
-typedef X_INPUT_SET_STATE(x_input_set_state);
-X_INPUT_SET_STATE(XInputSetStateStub)
-{
-    return 0;
-}
 // NOTE: hmmmm ... from xinput.h is just this two needed
 // so we load them dinamically
 // than you can access them trough pointer
@@ -69,11 +53,37 @@ X_INPUT_SET_STATE(XInputSetStateStub)
 // );
 // DAY6 29 min
 //
-
+#define X_INPUT_GET_STATE(name)                                                \
+    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+// this line ***
+typedef X_INPUT_GET_STATE(x_input_get_state);
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+    return 0;
+}
 global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+#define XInputGetState XInputGetState_
+
+#define X_INPUT_SET_STATE(name)                                                \
+    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+    return 0;
+}
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
-#define XInputGetState XInputGetState_;
-#define XInputSetState XInputSetState_;
+#define XInputSetState XInputSetState_
+
+internal void Win32LoadXInput(void)
+{
+    HMODULE XInputLibrary = LoadLibrary("xinput1_4.dll");
+    if (XInputLibrary) {
+        XInputGetState = (x_input_get_state *) GetProcAddress(XInputLibrary,
+                                                              "XInputGetState");
+        XInputSetState = (x_input_set_state *) GetProcAddress(XInputLibrary,
+                                                              "XInputSetState");
+    }
+}
 /*
  *
  * POINTER ALIASING
@@ -198,9 +208,9 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
 }
 
 internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
-                                         UINT   Message,
-                                         WPARAM WParam,
-                                         LPARAM LParam)
+                                                  UINT   Message,
+                                                  WPARAM WParam,
+                                                  LPARAM LParam)
 {
     LRESULT Result = 0;
 
@@ -254,7 +264,7 @@ int CALLBACK WinMain(HINSTANCE Instance,
 {
     // NOTE: stack overflow
     // uint8 BigOldHeavyBlockOfMemory[ 2 * 1024 * 1024] = {};
-
+    Win32LoadXInput();
     WNDCLASS WindowClass = {};
     Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
     WindowClass.style = CS_HREDRAW | CS_VREDRAW
@@ -326,6 +336,10 @@ int CALLBACK WinMain(HINSTANCE Instance,
 
                         int16 StickX = Pad->sThumbLX;
                         int16 StickY = Pad->sThumbLY;
+
+                        if (AButton) {
+                            ++YOffset;
+                        }
                     }
                     else {
                         // NOTE: any other error... this controller is not
@@ -345,7 +359,6 @@ int CALLBACK WinMain(HINSTANCE Instance,
                 // NOTE: (context3) and you dont have to release it
                 // ReleaseDC(Window, DeviceContext);
                 ++XOffset;
-                ++YOffset;
             }
         }
         else {
