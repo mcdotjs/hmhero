@@ -2,6 +2,6 @@
 
 mkdir ..\..\build
 pushd ..\..\build
-cl -FC -Zi ..\repo\code\win32_handmade.cpp User32.lib Gdi32.lib
+cl /std:c++17 -FC -Zi ..\repo\code\win32_handmade.cpp User32.lib Gdi32.lib
 
 popd

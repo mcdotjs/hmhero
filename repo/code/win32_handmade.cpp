@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <windows.h>
 #include <winuser.h>
+#include <xinput.h>
 
 #define internal static
 #define local_persist static // locally scoped, but persisting
@@ -34,6 +35,45 @@ struct win32_window_dimension {
     int Height;
 };
 
+#define X_INPUT_GET_STATE(name)                                                \
+    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+// this line ***
+typedef X_INPUT_GET_STATE(x_input_get_state);
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+    return 0;
+}
+
+#define X_INPUT_SET_STATE(name)                                                \
+    DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+    return 0;
+}
+// NOTE: hmmmm ... from xinput.h is just this two needed
+// so we load them dinamically
+// than you can access them trough pointer
+//
+// produce *** this line, so dont need it
+// typedef DWORD WINAPI x_input_get_state(
+//     DWORD         dwUserIndex, // Index of the gamer associated with the
+//     device XINPUT_STATE *pState       // Receives the current state
+// );
+//
+// again ***
+// typedef DWORD WINAPI x_input_set_state(
+//     DWORD dwUserIndex, // Index of the gamer associated with the device
+//     XINPUT_VIBRATION
+//         *pVibration // The vibration information to send to the controller
+// );
+// DAY6 29 min
+//
+
+global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
+#define XInputGetState XInputGetState_;
+#define XInputSetState XInputSetState_;
 /*
  *
  * POINTER ALIASING
@@ -45,7 +85,7 @@ struct win32_window_dimension {
  *
  * */
 
-win32_window_dimension Win32GetWindowDimension(HWND Window)
+internal win32_window_dimension Win32GetWindowDimension(HWND Window)
 {
     win32_window_dimension Result;
     RECT                   WindowRect;
@@ -61,7 +101,8 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
                                   int                    XOffset,
                                   int                    YOffset)
 {
-    // NOTE: let see what optimazer does, when buffer will be passed by value
+    // NOTE: let see what optimazer does, when buffer will be passed by
+    // value
     int Width = Buffer.Width;
     // NOTE: we need it for shifting byte by byte
     // because C it multiply by size of thing being pointed to
@@ -71,15 +112,16 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
         uint32 *Pixel = (uint32 *) Row; // get the pixel of the row
         for (int X = 0; X < Buffer.Width; ++X) {
             // xx RR GG BB xx RR GG BB
-            // uint8 Blue  = (uint8) (X + XOffset);
-            // uint8 Green = (uint8) (Y + YOffset);
+            uint8 Blue  = (uint8) (X + XOffset);
+            uint8 Green = (uint8) (Y + YOffset);
+            *Pixel++    = ((Blue << 8) | Green);
             // NOTE: *Pixel = *Pixel + 1*sizeof(uint32) // a that is 4
-      
+
             // Playing
-            uint8 Blue  = X;
-            uint8 Green = Y;
-            uint8 Red   = 255;
-            *Pixel++    = ((X + Y) << 16) * XOffset;
+            // uint8 Blue  = X;
+            // uint8 Green = Y;
+            // uint8 Red   = 255;
+            // *Pixel++    = ((X + Y) << 16) * XOffset;
         }
         // row is in bytes, Pitch is in bytes ... not in uint8
         Row += Buffer.Pitch;
@@ -104,9 +146,10 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Info.bmiHeader.biSize  = sizeof(Buffer->Info.bmiHeader);
     Buffer->Info.bmiHeader.biWidth = Buffer->Width;
 
-    // NOTE: when biHeight is negative, this is clue to Windows to treat this
-    // bitmap
-    //  as top-down ... meannig that first three bytes are RGB of top left pixel
+    // NOTE: when biHeight is negative, this is clue to Windows to treat
+    // this bitmap
+    //  as top-down ... meannig that first three bytes are RGB of top left
+    //  pixel
     Buffer->Info.bmiHeader.biHeight      = -Buffer->Height;
     Buffer->Info.bmiHeader.biPlanes      = 1;
     Buffer->Info.bmiHeader.biBitCount    = 32;
@@ -154,7 +197,7 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                   SRCCOPY);
 }
 
-LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
+internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                                          UINT   Message,
                                          WPARAM WParam,
                                          LPARAM LParam)
@@ -192,8 +235,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
         Win32DisplayBufferInWindow(
             DeviceContext, Dimension.Width, Dimension.Height, GlobalBackBuffer);
-        // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all was
-        // done
+        // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all
+        // was done
         EndPaint(Window, &PaintStruct);
     }
     default: {
@@ -254,6 +297,40 @@ int CALLBACK WinMain(HINSTANCE Instance,
                     // NOTE: actually translating keycodes
                     TranslateMessage(&Message);
                     DispatchMessage(&Message);
+                }
+
+                for (DWORD ControllerIndex = 0;
+                     ControllerIndex < XUSER_MAX_COUNT;
+                     ControllerIndex++) {
+
+                    XINPUT_STATE ControllerState;
+                    if (XInputGetState(ControllerIndex, &ControllerState)
+                        == ERROR_SUCCESS) {
+                        // NOTE: this controller is plugedin
+                        XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+                        bool Up   = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+                        bool Down = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+                        bool Left = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+                        bool Right =
+                            (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+                        bool Start = (Pad->wButtons & XINPUT_GAMEPAD_START);
+                        bool Back  = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+                        bool LeftShoulder =
+                            (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+                        bool RithtShoulder =
+                            (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+                        bool AButton = (Pad->wButtons & XINPUT_GAMEPAD_A);
+                        bool BButton = (Pad->wButtons & XINPUT_GAMEPAD_B);
+                        bool XButton = (Pad->wButtons & XINPUT_GAMEPAD_X);
+                        bool YButton = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+
+                        int16 StickX = Pad->sThumbLX;
+                        int16 StickY = Pad->sThumbLY;
+                    }
+                    else {
+                        // NOTE: any other error... this controller is not
+                        // available
+                    }
                 }
 
                 // NOTE: (context2)  and you have to instatianed context in
