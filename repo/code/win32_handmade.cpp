@@ -347,6 +347,11 @@ int CALLBACK WinMain(HINSTANCE Instance,
                     }
                 }
 
+                // vibes
+                XINPUT_VIBRATION Vib;
+                Vib.wLeftMotorSpeed = 60000;
+                XInputSetState(0, &Vib);
+
                 // NOTE: (context2)  and you have to instatianed context in
                 // every loop HDC DeviceContext = GetDC(Window);
                 RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
