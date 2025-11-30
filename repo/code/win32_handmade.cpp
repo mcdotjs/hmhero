@@ -107,20 +107,18 @@ internal win32_window_dimension Win32GetWindowDimension(HWND Window)
     return Result;
 };
 
-internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
+internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
                                   int                    XOffset,
                                   int                    YOffset)
 {
-    // NOTE: let see what optimazer does, when buffer will be passed by
-    // value
-    int Width = Buffer.Width;
+    int Width = Buffer->Width;
     // NOTE: we need it for shifting byte by byte
     // because C it multiply by size of thing being pointed to
     // (if uint16...it will be moved by two )
-    uint8 *Row = (uint8 *) Buffer.Memory; // get the row
-    for (int Y = 0; Y < Buffer.Height; ++Y) {
+    uint8 *Row = (uint8 *) Buffer->Memory; // get the row
+    for (int Y = 0; Y < Buffer->Height; ++Y) {
         uint32 *Pixel = (uint32 *) Row; // get the pixel of the row
-        for (int X = 0; X < Buffer.Width; ++X) {
+        for (int X = 0; X < Buffer->Width; ++X) {
             // xx RR GG BB xx RR GG BB
             uint8 Blue  = (uint8) (X + XOffset);
             uint8 Green = (uint8) (Y + YOffset);
@@ -134,7 +132,7 @@ internal void RenderWeirdGradient(win32_offscreen_buffer Buffer,
             // *Pixel++    = ((X + Y) << 16) * XOffset;
         }
         // row is in bytes, Pitch is in bytes ... not in uint8
-        Row += Buffer.Pitch;
+        Row += Buffer->Pitch;
         // OR
         // Row = (uint8 *) Pixel;
     }
@@ -175,7 +173,7 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
 internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                                          int                    WindowWidth,
                                          int                    WindowHeight,
-                                         win32_offscreen_buffer Buffer)
+                                         win32_offscreen_buffer *Buffer)
 {
     /*
      * NOTE:
@@ -199,10 +197,10 @@ internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
                   WindowHeight,
                   0,
                   0,
-                  Buffer.Width,
-                  Buffer.Height,
-                  Buffer.Memory,
-                  &Buffer.Info,
+                  Buffer->Width,
+                  Buffer->Height,
+                  Buffer->Memory,
+                  &Buffer->Info,
                   DIB_RGB_COLORS,
                   SRCCOPY);
 }
@@ -300,7 +298,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
 
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
         Win32DisplayBufferInWindow(
-            DeviceContext, Dimension.Width, Dimension.Height, GlobalBackBuffer);
+            DeviceContext, Dimension.Width, Dimension.Height, &GlobalBackBuffer);
         // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all
         // was done
         EndPaint(Window, &PaintStruct);
@@ -409,13 +407,13 @@ int CALLBACK WinMain(HINSTANCE Instance,
 
                 // NOTE: (context2)  and you have to instatianed context in
                 // every loop HDC DeviceContext = GetDC(Window);
-                RenderWeirdGradient(GlobalBackBuffer, XOffset, YOffset);
+                RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset);
                 win32_window_dimension Dimension =
                     Win32GetWindowDimension(Window);
                 Win32DisplayBufferInWindow(DeviceContext,
                                            Dimension.Width,
                                            Dimension.Height,
-                                           GlobalBackBuffer);
+                                           &GlobalBackBuffer);
                 // NOTE: (context3) and you dont have to release it
                 // ReleaseDC(Window, DeviceContext);
                 ++XOffset;
