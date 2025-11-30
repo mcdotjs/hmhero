@@ -236,9 +236,65 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         // case WM_SETCURSOR: {
         //     SetCursor(0);
         // } break;
+
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP: {
+        uint32 VKCode = WParam;
+        // NOTE:
+        // https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-syskeydown
+        //  I am not gona get 0 or 1, Im gettin 0 or bit 30
+        bool WasDown = ((LParam & (1 << 30)) != 0);
+        bool IsDown  = ((LParam & (1 << 31)) == 0);
+        if (WasDown != IsDown) {
+            if (VKCode == VK_UP) {
+                OutputDebugStringA("up\n");
+            }
+            else if (VKCode == VK_DOWN) {
+                OutputDebugStringA("down\n");
+            }
+            else if (VKCode == VK_RIGHT) {
+                OutputDebugStringA("right\n");
+            }
+            else if (VKCode == VK_LEFT) {
+                OutputDebugStringA("left\n");
+            }
+            else if (VKCode == VK_ESCAPE) {
+
+                OutputDebugStringA("esc: ");
+                if (IsDown) {
+                    OutputDebugStringA("is down");
+                }
+
+                if (WasDown) {
+                    OutputDebugStringA("was down");
+                }
+                OutputDebugStringA("esc\n");
+            }
+            else if (VKCode == VK_SPACE) {
+                OutputDebugStringA("space\n");
+            }
+            else if (VKCode == 'A') {
+                OutputDebugStringA("a\n");
+            }
+            else if (VKCode == 'W') {
+                OutputDebugStringA("w\n");
+            }
+            else if (VKCode == 'S') {
+                OutputDebugStringA("s\n");
+            }
+            else if (VKCode == 'D') {
+                OutputDebugStringA("d\n");
+            }
+            else if (VKCode == 'F') {
+                OutputDebugStringA("f\n");
+            }
+        }
+    } break;
+
     case WM_PAINT: {
         PAINTSTRUCT PaintStruct;
-        OutputDebugStringA("WM_PAINT");
 
         HDC DeviceContext = BeginPaint(Window, &PaintStruct);
 
@@ -250,7 +306,6 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         EndPaint(Window, &PaintStruct);
     }
     default: {
-        OutputDebugStringA("WM_Default");
         Result = DefWindowProc(Window, Message, WParam, LParam);
     } break;
     }
