@@ -51,7 +51,7 @@ struct win32_window_dimension {
 //     XINPUT_VIBRATION
 //         *pVibration // The vibration information to send to the controller
 // );
-// DAY6 29 min
+// DAY6 29 min or QA
 //
 #define X_INPUT_GET_STATE(name)                                                \
     DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -59,7 +59,7 @@ struct win32_window_dimension {
 typedef X_INPUT_GET_STATE(x_input_get_state);
 X_INPUT_GET_STATE(XInputGetStateStub)
 {
-    return 0;
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
 #define XInputGetState XInputGetState_
@@ -69,7 +69,7 @@ global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
 typedef X_INPUT_SET_STATE(x_input_set_state);
 X_INPUT_SET_STATE(XInputSetStateStub)
 {
-    return 0;
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
@@ -78,10 +78,10 @@ internal void Win32LoadXInput(void)
 {
     HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
     if (XInputLibrary) {
-        XInputGetState = (x_input_get_state *) GetProcAddress(
-            XInputLibrary, "XInputGetState");
-        XInputSetState = (x_input_set_state *) GetProcAddress(
-            XInputLibrary, "XInputSetState");
+        XInputGetState = (x_input_get_state *) GetProcAddress(XInputLibrary,
+                                                              "XInputGetState");
+        XInputSetState = (x_input_set_state *) GetProcAddress(XInputLibrary,
+                                                              "XInputSetState");
     }
 }
 /*
@@ -108,8 +108,8 @@ internal win32_window_dimension Win32GetWindowDimension(HWND Window)
 };
 
 internal void RenderWeirdGradient(win32_offscreen_buffer *Buffer,
-                                  int                    XOffset,
-                                  int                    YOffset)
+                                  int                     XOffset,
+                                  int                     YOffset)
 {
     int Width = Buffer->Width;
     // NOTE: we need it for shifting byte by byte
@@ -170,9 +170,9 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Pitch = Buffer->Width * BitesPerPixel;
 }
 
-internal void Win32DisplayBufferInWindow(HDC                    DeviceContext,
-                                         int                    WindowWidth,
-                                         int                    WindowHeight,
+internal void Win32DisplayBufferInWindow(HDC                     DeviceContext,
+                                         int                     WindowWidth,
+                                         int                     WindowHeight,
                                          win32_offscreen_buffer *Buffer)
 {
     /*
@@ -289,6 +289,10 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                 OutputDebugStringA("f\n");
             }
         }
+        bool AltKeyWasDown = ((LParam & (1 << 29)) != 0);
+        if ((VKCode == VK_F4) && AltKeyWasDown) {
+            GlobalRunning = false;
+        }
     } break;
 
     case WM_PAINT: {
@@ -297,8 +301,10 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
         HDC DeviceContext = BeginPaint(Window, &PaintStruct);
 
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-        Win32DisplayBufferInWindow(
-            DeviceContext, Dimension.Width, Dimension.Height, &GlobalBackBuffer);
+        Win32DisplayBufferInWindow(DeviceContext,
+                                   Dimension.Width,
+                                   Dimension.Height,
+                                   &GlobalBackBuffer);
         // NOTE: povies windowsu ze vsetko co mal namalovat namaloval... all
         // was done
         EndPaint(Window, &PaintStruct);
