@@ -1,7 +1,5 @@
-#include <cstdint>
 #include <stdint.h>
 #include <windows.h>
-#include <winuser.h>
 #include <xinput.h>
 
 #define internal static
@@ -16,6 +14,8 @@ typedef int8_t   int8;
 typedef int16_t  int16;
 typedef int32_t  int32;
 typedef int64_t  int64;
+
+typedef int32 bool32;
 
 // NOTE: pixels are always 32-bits wide, little endian 0x xx RR GG BB
 // memory ordered BB GG RR xx
@@ -289,7 +289,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND   Window,
                 OutputDebugStringA("f\n");
             }
         }
-        bool AltKeyWasDown = ((LParam & (1 << 29)) != 0);
+        bool32 AltKeyWasDown = (LParam & (1 << 29));
         if ((VKCode == VK_F4) && AltKeyWasDown) {
             GlobalRunning = false;
         }
