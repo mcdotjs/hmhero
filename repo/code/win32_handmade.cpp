@@ -1,5 +1,10 @@
+#include <dsound.h>
+#include <libloaderapi.h>
+#include <mmeapi.h>
 #include <stdint.h>
+#include <windef.h>
 #include <windows.h>
+#include <winerror.h>
 #include <xinput.h>
 
 #define internal static
@@ -74,6 +79,11 @@ X_INPUT_SET_STATE(XInputSetStateStub)
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
 
+#define DIRECT_SOUND_CREATE(name)                                              \
+    HRESULT WINAPI name(                                                       \
+        LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
+typedef DIRECT_SOUND_CREATE(direct_sound_create);
+
 internal void Win32LoadXInput(void)
 {
     HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
@@ -82,6 +92,9 @@ internal void Win32LoadXInput(void)
                                                               "XInputGetState");
         XInputSetState = (x_input_set_state *) GetProcAddress(XInputLibrary,
                                                               "XInputSetState");
+    }
+    else {
+        // TODO: diagnostics
     }
 }
 /*
@@ -94,6 +107,84 @@ internal void Win32LoadXInput(void)
  *
  *
  * */
+internal void Win32InitDSound(HWND  Window,
+                              int32 SamplesPerSecond,
+                              int32 BufferSize)
+{
+    // NOTE: 1. load library
+    HMODULE DSoundLibrary = LoadLibraryA("dsound.dll");
+    if (DSoundLibrary) {
+        // NOTE: 2. get a DirectSound object
+        direct_sound_create *DirectSoundCreate =
+            (direct_sound_create *) GetProcAddress(DSoundLibrary,
+                                                   "DirectSoundCreate");
+        LPDIRECTSOUND DirectSound;
+        // NOTE: succeeded is just like ...return ERROR_DEVICE_NOT_CONNECTED; in
+        // xinput stuff... some windows magic ...
+        if (DirectSoundCreate
+            && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0))) {
+            WAVEFORMATEX WaveFormat   = {};
+            WaveFormat.wFormatTag     = WAVE_FORMAT_PCM;
+            WaveFormat.nChannels      = 2;
+            WaveFormat.nSamplesPerSec = SamplesPerSecond;
+            WaveFormat.wBitsPerSample = 16; // CD is in 16 bits
+            WaveFormat.nBlockAlign =
+                (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+            WaveFormat.nAvgBytesPerSec =
+                WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+            WaveFormat.cbSize = 0;
+            if (SUCCEEDED(
+                    DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY))) {
+
+                DSBUFFERDESC BufferDescription = {};
+                BufferDescription.dwFlags      = DSBCAPS_PRIMARYBUFFER;
+                BufferDescription.dwSize       = sizeof(BufferDescription);
+
+                // NOTE: 3. create primary buffer
+                // this is not use as buffer
+                // this is just telling windows this is the sound we wanna play
+                // legacy basically
+                LPDIRECTSOUNDBUFFER PrimaryBuffer;
+                if (SUCCEEDED(DirectSound->CreateSoundBuffer(
+                        &BufferDescription, &PrimaryBuffer, 0))) {
+                    HRESULT Error = PrimaryBuffer->SetFormat(&WaveFormat);
+                    if (SUCCEEDED(Error)) {
+                        OutputDebugStringA("PrimaryBuffer format was set.\n");
+                    }
+                    else {
+                        // TODO: diagnostics
+                    }
+                }
+                else {
+                    // TODO: diagnostics
+                }
+            }
+            else {
+                // TODO: diagnostics
+            }
+            // NOTE: 3. create secondary buffer
+            DSBUFFERDESC BufferDescription  = {};
+            BufferDescription.dwSize        = sizeof(BufferDescription);
+            BufferDescription.dwFlags       = 0;
+            BufferDescription.dwBufferBytes = BufferSize;
+            BufferDescription.lpwfxFormat   = &WaveFormat;
+            LPDIRECTSOUNDBUFFER SecondaryBuffer;
+            HRESULT             Error = DirectSound->CreateSoundBuffer(
+                &BufferDescription, &SecondaryBuffer, 0);
+            if (SUCCEEDED(Error)) {
+
+                OutputDebugStringA("SecondaryBuffer was created.\n");
+                // NOTE: 4. start it playing DELLLLLEETED
+            }
+            else {
+                // TODO: diagnostics
+            }
+        }
+        else {
+            // TODO: diagnostics
+        }
+    }
+};
 
 internal win32_window_dimension Win32GetWindowDimension(HWND Window)
 {
@@ -164,8 +255,8 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,
     Buffer->Info.bmiHeader.biCompression = BI_RGB;
     int BitesPerPixel                    = 4;
     int BitmapMemorySize = (Buffer->Width * Buffer->Height) * BitesPerPixel;
-    Buffer->Memory =
-        VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    Buffer->Memory       = VirtualAlloc(
+        0, BitmapMemorySize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
     Buffer->Pitch = Buffer->Width * BitesPerPixel;
 }
@@ -347,6 +438,9 @@ int CALLBACK WinMain(HINSTANCE Instance,
                                       Instance,
                                       0);
         if (Window) {
+            // NOTE: we can init direct just when we have window
+            // 48? .. 2 seconds ... dont remember Math
+            Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
             // NOTE: (context1) this is usually not alloved by windows
             // unless you asked specifically for it
             // by this flag CS_OWNDC.. and we are not sharing context
