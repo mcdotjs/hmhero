@@ -458,8 +458,7 @@ int CALLBACK WinMain(HINSTANCE Instance,
             int16  ToneVolume           = 1000;
 
             Win32InitDSound(Window, SamplesPerSecond, SecondaryBufferSize);
-
-            GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+            bool32 SoundIsPlaying = false;
             // NOTE: (context1) this is usually not alloved by windows
             // unless you asked specifically for it
             // by this flag CS_OWNDC.. and we are not sharing context
@@ -535,8 +534,10 @@ int CALLBACK WinMain(HINSTANCE Instance,
                     DWORD BytesToLock = RunningSampleIndex * BytesPerSample
                                         % SecondaryBufferSize;
                     DWORD BytesToWrite;
-
-                    if (BytesToLock > PlayCursor) {
+                    if (BytesToLock == PlayCursor) {
+                        BytesToWrite = SecondaryBufferSize;
+                    }
+                    else if (BytesToLock > PlayCursor) {
                         BytesToWrite = SecondaryBufferSize - BytesToLock;
                         BytesToWrite += PlayCursor;
                     }
@@ -589,6 +590,11 @@ int CALLBACK WinMain(HINSTANCE Instance,
                         GlobalSecondaryBuffer->Unlock(
                             Region1, Region1Size, Region2, Region2Size);
                     }
+                }
+
+                if (!SoundIsPlaying) {
+                    GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+                    SoundIsPlaying = true;
                 }
 
                 win32_window_dimension Dimension =
