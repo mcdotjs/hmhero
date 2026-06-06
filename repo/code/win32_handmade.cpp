@@ -482,6 +482,10 @@ int CALLBACK WinMain(HINSTANCE Instance,
                      HINSTANCE PrevInstance,
                      PSTR CommandLine,
                      int ShowCode) {
+    LARGE_INTEGER PerformanceFrequency;
+    QueryPerformanceFrequency(&PerformanceFrequency);
+    int64 PerfCounterFrequency = PerformanceFrequency.QuadPart;
+
     // NOTE: stack overflow
     // uint8 BigOldHeavyBlockOfMemory[ 2 * 1024 * 1024] = {};
     Win32LoadXInput();
@@ -493,6 +497,7 @@ int CALLBACK WinMain(HINSTANCE Instance,
     WindowClass.lpfnWndProc = Win32MainWindowCallback;
     WindowClass.hInstance = Instance;
     WindowClass.lpszClassName = "HandmadeHeroWindowClass";
+
 
     if (RegisterClass(&WindowClass)) {
         HWND Window = CreateWindowExA(0,
@@ -539,7 +544,17 @@ int CALLBACK WinMain(HINSTANCE Instance,
             // with anyone
 
             GlobalRunning = true;
+
+            LARGE_INTEGER LastCounter;
+            QueryPerformanceCounter(&LastCounter);
+            uint64 LastCycleCount = __rdtsc();
+
             while (GlobalRunning) {
+                // int a = sizeof(LARGE_INTEGER);
+                // LPCSTR b = "jkl" + a;
+                // OutputDebugStringA(b);
+                // sizeof(int8);
+
                 MSG Message;
                 // NOTE: if (PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) {
                 // we have a lot of messages ... if to while
@@ -643,6 +658,23 @@ int CALLBACK WinMain(HINSTANCE Instance,
                 // NOTE: (context3) and you dont have to release it
                 // ReleaseDC(Window, DeviceContext);
                 ++XOffset;
+
+                uint64 EndCycleCount = __rdtsc();
+
+
+                LARGE_INTEGER EndCounter;
+                QueryPerformanceCounter(&EndCounter);
+
+                uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+                int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+                int32 MSPerFrame = (int32) ((1000 * CounterElapsed) / PerfCounterFrequency);
+                int32 FPS = PerfCounterFrequency / CounterElapsed;
+                int32 MCPF = (int32) (CyclesElapsed / (1000 * 1000));
+                char Buffer[256];
+                wsprintf(Buffer, "Miliseconds pre frame: %dms/f, fps: %df/s, megacycles: %dmc/f\n", MSPerFrame, FPS, MCPF);
+                OutputDebugStringA(Buffer);
+                LastCounter = EndCounter;
+                LastCycleCount = EndCycleCount;
             }
         } else {
             // TODO: logging
